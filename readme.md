@@ -28,13 +28,13 @@ Particularly, correctly installing and configuring PyOpenCL might take some time
 
 ## Getting started
 To start the Graphical User interface, run `GUI.py` inside the Graptor folder (e.g. in a terminal via `python GUI.py` or similarly from an Python development environment). 
-We refer to the manual for precise instructions on how to use the GUI. It is adviced to run the examples in the manual with the phantom test data in order to get a grasp of the relevant functions and options.
+We refer to the [manual](manual/manual.pdf) for precise instructions on how to use the GUI. It is adviced to run the examples in the manual with the phantom test data in order to get a grasp of the relevant functions and options.
 
 Additionally, the script `Reconstruction_coupled.py` is provided for using the reconstruction algorithm inside a terminal. You can find help via `python Reconstruction_coupled.py --help` concerning possible parameters as well as an example for the call.
 
 ## Known issues
 
-* There appears to be an issue with the automatic splitting in case of insufficient GPU memory under Windows. If problems occur, try to use the `Maximal split size` option in the GUI or the `Splitsize` paramter of the code to reduce memory requirements.
+* There appears to be an issue with the automatic splitting in case of insufficient GPU memory under Windows. If problems occur, try to use the `Maximal chunk size` option in the GUI or the `--Chunksize` parameter of `Reconstruction_coupled.py` to reduce memory requirements.
 
 ## Authors
 
