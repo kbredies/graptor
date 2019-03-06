@@ -32,8 +32,8 @@
 ## 
 ## [1] R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner,
 ##     K. Bredies. Total Generalized Variation regularization for
-##     multi-modal electron tomography. RSC Nanoscale, accepted
-##     January 2019.
+##     multi-modal electron tomography. *Nanoscale*, 2019. 
+##     DOI: [10.1039/C8NR09058K](https://doi.org/10.1039/C8NR09058K).
 ##
 ## [2] M. Holler, R. Huber, F. Knoll. Coupled regularization with
 ##     multiple data discrepancies. Inverse Problems, Special
@@ -369,11 +369,11 @@ def readh5(name):
 		mrc= mrcfile.open(name,'r',permissive=True)
 		A=mrc.data
 		Na,Nx,Ny=A.shape
-		data=np.zeros([Na,Nx,Ny])
-		data[:]=A[:]
-		np_data=np.zeros([Na,Ny,Nx])
-		for i in range(Nx):
-			np_data[:,:,i]=data[:,i,:]
+		np_data=np.zeros([Na,Nx,Ny])
+		np_data[:]=A[:]
+		#np_data=np.zeros([Na,Ny,Nx])
+		#for i in range(Nx):
+		#	np_data[:,:,i]=data[:,i,:]
 		
 		angles=[]
 		if os.path.isfile(name.replace('.mrc','.rawtlt'))==True:
@@ -433,11 +433,11 @@ def readh5alternative(name):
 		mrc= mrcfile.open(name,'r',permissive=True)
 		A=mrc.data
 		Na,Nx,Ny=A.shape
-		data=np.zeros([Na,Nx,Ny])
-		data[:]=A[:]
-		np_data=np.zeros([Na,Ny,Nx])
-		for i in range(Nx):
-			np_data[:,:,i]=data[:,i,:]
+		np_data=np.zeros([Na,Nx,Ny])
+		np_data[:]=A[:]
+		#np_data=np.zeros([Na,Ny,Nx])
+		#for i in range(Nx):
+		#	np_data[:,:,i]=data[:,i,:]
 		angles=[]
 		if os.path.isfile(name.replace('.mrc','.rawtlt'))==True:
 			File = open(name.replace('.mrc','.rawtlt'),'r') 

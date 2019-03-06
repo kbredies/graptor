@@ -30,8 +30,8 @@
 ## 
 ## [1] R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner,
 ##     K. Bredies. Total Generalized Variation regularization for
-##     multi-modal electron tomography. RSC Nanoscale, accepted
-##     January 2019.
+##     multi-modal electron tomography. *Nanoscale*, 2019. 
+##     DOI: [10.1039/C8NR09058K](https://doi.org/10.1039/C8NR09058K).
 ##
 ## [2] M. Holler, R. Huber, F. Knoll. Coupled regularization with
 ##     multiple data discrepancies. Inverse Problems, Special
@@ -71,6 +71,12 @@ def Reconstructionapproach2d(sino,angles,Parameter,mu,maxiter,ctx,plott,discrepa
 	sectionwidth=Info[1]
 	current=Info[2]
 	
+	#This is a hack that avoids a bug that seems to occur when zero initializing arrays of size >2GB with clarray.zeros
+	def zeros_hack(*args, **kwargs):
+		res = clarray.empty(*args, **kwargs)
+		res[:] = 0
+		return res
+	clarray.zeros = zeros_hack
 
 
 	#Create Py Opencl Program
@@ -738,8 +744,6 @@ __kernel void radon_ad(__global float *img, __global float *sino,
 		Lamb=clarray.zeros(queue,(F0.shape[1],F0.shape[2],Nz*Number_Channels),dtype=float32, order='F')
 		KU=clarray.zeros(queue,(F0.shape[1],F0.shape[2],Nz*Number_Channels),dtype=float32, order='F')
 		KSTARlambda=clarray.zeros(queue, (img_shape[0],img_shape[1],Nz*Number_Channels), dtype=float32, order='F')
-		W=clarray.zeros(queue, (4,img_shape[0],img_shape[1],Nz*Number_Channels), dtype=float32, order='F')
-		U_=clarray.zeros(queue, (img_shape[0],img_shape[1],Nz*Number_Channels), dtype=float32, order='F')
 		
 		normV=clarray.zeros_like(U)
 		normW=clarray.zeros_like(U)

@@ -34,8 +34,8 @@
 ## 
 ## [1] R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner,
 ##     K. Bredies. Total Generalized Variation regularization for
-##     multi-modal electron tomography. RSC Nanoscale, accepted
-##     January 2019.
+##     multi-modal electron tomography. *Nanoscale*, 2019. 
+##     DOI: [10.1039/C8NR09058K](https://doi.org/10.1039/C8NR09058K).
 ##
 ## [2] M. Holler, R. Huber, F. Knoll. Coupled regularization with
 ##     multiple data discrepancies. Inverse Problems, Special
@@ -90,6 +90,10 @@ def replace_ext(fname, new_ext):
 	return name+"."+new_ext
 
 
+
+
+
+
 ##Function is called if GUI is closed. Ensures that all processes are closed
 def ask_quit():
 	#if tkMessageBox.askokcancel("Quit", "You want to quit now? All currently running reconstructions will be aborted!"):
@@ -119,6 +123,15 @@ def ask_quit():
 				#time.sleep(3)
 				os._exit(1)
 	elif request==0:
+		while initial_computationbutton.successor!=None:
+			computationbuttonnew=initial_computationbutton.successor			
+			try:
+				initial_computationbutton.stoppingbut.Stopp()
+			except:
+				print('an error occured in ', initial_computationbutton.namefield.get())
+				pass
+			print ('successfully_destroyed ', initial_computationbutton.namefield.get())
+			initial_computationbutton=computationbuttonnew							
 		os._exit(1)
 #Fenster Erstellen
 fenster=Tk()
@@ -145,7 +158,7 @@ class Outline:
 		
 		self.entryfield=Entry(frame);
 		self.entryfield.pack(side=LEFT)
-		self.entryfield.insert(0,'results/recon')
+		self.entryfield.insert(0,os.path.join('results','recon'))
  
 		
 		self.frame=frame
@@ -168,8 +181,8 @@ class Bad_file:
 	def __init__(self,master,pos,text1,text2):
 		self.frame=Frame(master)
 		self.frame.grid(row=pos,column=0,sticky='W')
-		self.var = IntVar()
-		self.button= Checkbutton(self.frame, text=text1, variable=self.var,command=self.show_input)
+		
+		self.button= Label(self.frame, text=text1)
 		self.button.grid(row=pos,column=0,sticky='W')
 		self.pos=pos
 		self.hiddenframe=Frame(self.frame)
@@ -179,25 +192,32 @@ class Bad_file:
 		self.entryfield.pack(side=LEFT)
 		self.browsbutton=Button(self.hiddenframe,text='Browse',command=self.browse)
 		self.browsbutton.pack()
-		self.hiddenframe.grid_remove()
-	def show_input(self):
 		
-		if self.var.get()==0:
-			self.hiddenframe.grid_remove()
-		else:		
-			self.hiddenframe.grid(row=self.pos,column=1)
 	def browse(self):
 		try:
 			global startingpath
 			fenster.filename = tkFileDialog.askopenfilename(initialdir=startingpath,title = "Select file",filetypes = (("text files","*.txt"),("all files","*.*")))
 			
 			if fenster.filename!='':
-				startingpath= '/'.join( fenster.filename.split('/')[:-1] )
+				startingpath= os.path.split(fenster.filename)[0]#folderseparator.join( fenster.filename.split(folderseparator)[:-1] )
 				self.entryfield.delete(0, END)
 				self.entryfield.insert(0,os.path.relpath(fenster.filename))
 		except:
 			pass
 
+class Bad_direct_field():
+	def __init__(self,master,pos,text1,text2,my_width=30) :
+		self.frame=Frame(master) 
+		self.frame.grid(row=pos,column=0,sticky='W') 
+		self.button=Label(self.frame, text=text1,width=my_width,anchor='w') 
+		self.button.grid(row=pos,column=0,sticky='W') 
+		self.pos=pos 
+		self.hiddenframe=Frame(self.frame) 
+		self.hiddenframe.grid(row=pos,column=1,sticky='W') 
+		Label(self.hiddenframe,text=text2).pack(side=LEFT) 
+		self.entryfield=Entry(self.hiddenframe,width=30) 
+		self.entryfield.pack(side=LEFT) 
+		self.entryfield.insert(0,'') 
 
 ###Irrelevant Bad search widget class
 class Bad_Search:
@@ -229,13 +249,13 @@ class Badprojections:
 		self.var = IntVar()
 		self.frame=Frame(master)
 		self.frame.grid(row=pos,column=0,columnspan=2,sticky='N,W')
-		self.button= Checkbutton(self.frame, text=text1, variable=self.var,command=self.show_input)
+		self.button= Checkbutton(self.frame, text=text1, variable=self.var,command=self.show_input,width=30,anchor='w')
 		self.button.grid(row=pos,column=0,sticky='N,W')
 		self.pos=pos
 		self.hiddenframe=Frame(self.frame,relief="sunken",borderwidth=1)
 		self.hiddenframe.grid(row=pos,column=1,sticky='W')
 
-		self.Firstbutton=Button_with_fields(self.hiddenframe,0,text2[0],'',0,'')
+		self.Firstbutton=Bad_direct_field(self.hiddenframe,0,text2[0],'',12)
 		self.Secondbutton=Bad_file(self.hiddenframe,1,text2[1],'')
 		#self.Thirdbutton=Bad_Search(self.hiddenframe,2,text2[2],'')
 		self.hiddenframe.grid_remove()
@@ -249,13 +269,12 @@ class Badprojections:
 
 ###Widget class of a button activating a field to be written in
 class Button_with_fields:
-	def __init__(self,master,pos,text1,text2,state,default):
+	def __init__(self,master,pos,text1,text2,state,default,my_width=30):
 
 		self.var = IntVar() 
 		self.frame=Frame(master) 
 		self.frame.grid(row=pos,column=0,sticky='W') 
-		self.button=Checkbutton(self.frame, text=text1, 
-		variable=self.var,command=self.show_input) 
+		self.button=Checkbutton(self.frame, text=text1, variable=self.var,command=self.show_input,width=my_width,anchor='w') 
 		self.button.grid(row=pos,column=0,sticky='W') 
 		self.pos=pos 
 		self.hiddenframe=Frame(self.frame) 
@@ -389,13 +408,19 @@ class Slicereader:
 		Label(frame2,text='Start').grid(row=pos,column=1)
 		Label(frame2,text='End').grid(row=pos,column=2)
 		Label(frame2,text='Step size').grid(row=pos,column=3)
+		frame3=Frame(frame)
+		self.frame3=frame3
+		frame3.grid(row=pos,column=2,sticky='w')
+		Label(frame3,text='Maximal chunk size').grid(row=pos,column=4)
 		self.start=Entry(frame2,width=10)
 		self.end=Entry(frame2,width=10)
 		self.step=Entry(frame2,width=10)
+		self.split=Entry(frame3,width=10)
 		self.step.insert(0,1)
 		self.start.grid(row=pos+1,column=1)
 		self.end.grid(row=pos+1,column=2)
 		self.step.grid(row=pos+1,column=3)
+		self.split.grid(row=pos+1,column=4)
 		
 ###Widget Class for plot and overlay information, depicting a button and a field
 class Checkbuttons:
@@ -464,8 +489,10 @@ class Inputline:
 		self.master=master
 		frame=Frame(master)
 		frame.grid()
-		tip = ListboxToolTip(frame, ["Enter the file name you want to read projection data from. The input image data are required to be in MRC format. Additionally, a file containing the relevant angles is needed, either a text file (with same name ending with .rawtlt) containing one angle each line or a CSV file (with same name ending in .csv) separated by ','. The angles are supposed to be given in degree (0-360). The channel name allows to identify the channel easily during the reconstruction process. The weights are used to give a suitable amount of regularization (smoothing) to each channel, see also automated weight choice and the manual for tips on finding suitable parameters. The view option (+/- buttons) allows you to browse through the data."],[550,170]) 
-
+		
+				
+		
+		
 		self.frame=frame
 		self.entryfield=Entry(frame,width=30);
 		self.entryfield.grid(row=1,column=1)
@@ -476,10 +503,14 @@ class Inputline:
 		self.Channelname=Entry(frame)
 		self.Channelname.grid(row=1,column=3)
 		
+		
+
+		
 		self.weight=Entry(frame,width=13)
 		self.weight.grid(row=1,column=4)
-		self.weight.insert(0, "0.01")
-						
+		self.weight.insert(0, "1.0")
+		
+		
 		self.viewminus=Button(frame,text='-', command=self.decrease_projectionnumber)
 		self.viewminus.grid(row=1, column=5)				
 		
@@ -490,6 +521,7 @@ class Inputline:
 		self.angles=[1]
 		self.projection_number_field=Entry(frame,width=4,text=self.projection_number)
 		self.projection_number_field.grid(row=1,column=6)
+			
 		
 		#Called whenever variable projection_number is updated
 		def Follow_variable(value):
@@ -514,6 +546,9 @@ class Inputline:
 		self.viewplus=Button(frame,text='+', command=self.increase_projectionnumber)
 		self.viewplus.grid(row=1, column=7)
 		
+
+		
+		
 		self.Nextbutton=Button(master,text='+',command=self.create_new_infoline)
 		self.Nextbutton.grid()
 		
@@ -521,6 +556,24 @@ class Inputline:
 		self.deletebutton.grid(row=1,column=0)
 		self.data=None
 		self.angles=[0]
+		
+		self.tip = ListboxToolTip(frame, ["Enter the file name you want to read projection data from. The input image data are required to be in MRC format. Additionally, a file containing the relevant angles is needed, either a text file (with same name ending with .rawtlt) containing one angle each line or a CSV file (with same name ending in .csv) separated by ','. The angles are supposed to be given in degree (0-360). The channel name allows to identify the channel easily during the reconstruction process. The weights are used to give a suitable amount of regularization (smoothing) to each channel, see also automated weight choice and the manual for tips on finding suitable parameters. The view option (+/- buttons) allows you to browse through the data."],[550,170]) 
+
+		
+		self.Channelname.bind("<FocusIn>",self.tip.leave)
+		self.entryfield.bind("<FocusIn>",self.tip.leave)
+		self.Channelname.bind("<Key>",self.tip.leave)
+		self.entryfield.bind("<Key>",self.tip.leave)
+		
+		self.weight.bind("<FocusIn>",self.tip.leave)
+		self.weight.bind("<Key>",self.tip.leave)
+		self.projection_number_field.bind("<FocusIn>",self.tip.leave)
+		self.projection_number_field.bind("<Key>",self.tip.leave)
+		
+		self.viewminus.bind("<Button-1>",self.tip.leave)
+		self.viewplus.bind("<Button-1>",self.tip.leave)
+		self.browsbutton.bind("<Button-1>",self.tip.leave)
+		self.deletebutton.bind("<Button-1>",self.tip.leave)
 	
 	### Increases the projection_number and calls watch to update the plot
 	def increase_projectionnumber(self):
@@ -646,7 +699,7 @@ class Inputline:
 			
 			
 			if fenster.filename!='':
-				startingpath= '/'.join( fenster.filename.split('/')[:-1] )
+				startingpath= os.path.split(fenster.filename)[0]#folderseparator.join( fenster.filename.split(folderseparator)[:-1] )
 				self.entryfield.delete(0, END)
 				self.entryfield.insert(0,os.path.relpath(fenster.filename))
 		except Exception as err:
@@ -678,7 +731,7 @@ class Inputline:
 			self.entryfield.delete(0, END)
 			self.Channelname.delete(0,END)
 			self.weight.delete(0,END)
-			self.weight.insert(0,'0.01')
+			self.weight.insert(0,'1.0')
 			self.projection_number.set('0')
 			self.name_old=''
 			self.figure_number=-1
@@ -746,7 +799,7 @@ class create_anglefile():
 		self.entry3.grid(column=1,row=4)
 		self.Label3=Label(self.frame,text='Step size: ')
 		self.Label3.grid(column=0,row=4)
-		self.Button=Button(self.frame,text='Create File',command=self.create)
+		self.Button=Button(self.frame,text='Create file',command=self.create)
 		self.Button.grid(column=0,columnspan=2,row=5)
 
 		self.Label4 = Label(self.frame,text='')
@@ -798,7 +851,7 @@ def Extract_Information():
 	count=0
 	for item in Infilelist:
 		if item.Channelname.get()=='': #Give names to unnamed channels
-			item.Channelname.insert(0,'Channel_'+str(count))
+			item.Channelname.insert(0,'channel_'+str(count))
 		count+=1
 	count=0
 	
@@ -876,21 +929,21 @@ def Extract_Information():
 	Bad_direct=[]
 	
 	if Bad==1:
-		if Badprojection_choice.Firstbutton.var.get()==1:
-			A=Badprojection_choice.Firstbutton.entryfield.get()
-			A=A.replace(' ',',')
-			A=A.split(',')
-			while '' in A:
-				A.remove('')
-			try:
-				for a in A:
-					Bad_direct.append(int(a))
-			except ValueError:
-				Complaint.append('Could not interpret values for directly entered bad projections.')  
-		if Badprojection_choice.Secondbutton.var.get()==1:
-			Bad_file=Badprojection_choice.Secondbutton.entryfield.get()
-			if  not os.path.isfile( Bad_file ):
-				Complaint.append('Bad projection text file does not exist.')
+		#if Badprojection_choice.Firstbutton.var.get()==1:
+		A=Badprojection_choice.Firstbutton.entryfield.get()
+		A=A.replace(' ',',')
+		A=A.split(',')
+		while '' in A:
+			A.remove('')
+		try:
+			for a in A:
+				Bad_direct.append(int(a))
+		except ValueError:
+			Complaint.append('Could not interpret values for directly entered bad projections.')  
+		#if Badprojection_choice.Secondbutton.var.get()==1:
+		Bad_file=Badprojection_choice.Secondbutton.entryfield.get()
+		if  not os.path.isfile( Bad_file ) and Bad_file !='':
+			Complaint.append('Bad projection text file does not exist.')
 		#if Badprojection_choice.Thirdbutton.var.get()==1:
 		#	try:
 		#		Badsearch=[float(Badprojection_choice.Thirdbutton.entryfield1.get()),float(Badprojection_choice.Thirdbutton.entryfield2.get())]
@@ -927,6 +980,15 @@ def Extract_Information():
 		slices.append(int(slices_choice.step.get()))
 	except ValueError:
 		Complaint.append('Could not interpret the step value in slices to process.')	
+	
+	
+	try:
+		chunksize=str(int(slices_choice.split.get()))
+	except ValueError:
+		if slices_choice.split.get()!='':
+			Complaint.append('Could not interpret the maximal chunk size, must be integer')
+		else:
+			chunksize='-1'
 	
 	plot=[]
 	try:
@@ -969,7 +1031,7 @@ def Extract_Information():
 			Text+= '\n'+str(count)+ '): '+con
 		message=tkMessageBox.showinfo('Complaints',Text)
 	else:
-		commandline=str(sys.executable)
+		commandline='"'+str(sys.executable)+'"'
 		commandline+=' Reconstruction_coupled.py '
 		for name in Names:
 			commandline+='"'+name+'"'+' '
@@ -995,6 +1057,9 @@ def Extract_Information():
 		commandline+='--SliceLevels '
 		for i in range(0,3):
 			commandline+=str(slices[i])+' '
+		
+		commandline+='--Chunksize '+chunksize+' '
+		
 		
 		commandline+='--Channelnames '
 		for name in Channelnames:
@@ -1261,7 +1326,7 @@ class computationbutton():
 		
 		self.name= StringVar()
 		self.namefield=Entry(self.computationbuttonframe,textvariable=self.name)
-		self.namefield.insert(END,'Computation'+str(computationbutton.Computationcounter))
+		self.namefield.insert(END,'computation_'+str(computationbutton.Computationcounter))
 		computationbutton.Computationcounter+=1
 		self.namefield.grid(row=0,column=1)
 		
@@ -1297,8 +1362,8 @@ class computationbutton():
 			for item in Infilelist:
 				Channelnames.append(item.Channelname.get())
 			if len(Infilelist)>1:
-				Channelnames.append('Collection')
-				Channelnames.append('Collection2')
+				Channelnames.append('all_channels')
+				Channelnames.append('all_channels_normalized')
 			self.Channelnames=Channelnames
 			#self.Outputadress=Outputaddress.entryfield.get()
 			
@@ -1308,12 +1373,12 @@ class computationbutton():
 			slices.append(int(slices_choice.step.get()))
 			self.slices=range(slices[0],slices[1]+1,slices[2])
 			
-			self.commandline=self.commandline.replace('"<outputfile>"','tmp/'+str(self.number)+'/result')
+			self.commandline=self.commandline.replace('"<outputfile>"','"'+os.path.join('tmp',str(self.number),'result')+'"')
 			
 			self.task=ThreadedTask(self.queue,self.commandline,self)
 	
 			self.task.start()
-			self.commandline=self.commandline.replace('tmp/'+str(self.number)+'/result','"<outputfile>" ')
+			self.commandline=self.commandline.replace('"'+os.path.join('tmp',str(self.number),'result')+'"','"<outputfile>" ')
 			
 			self.Computationbutton.grid_forget()
 			self.Progressbutton=Label(self.computationbuttonframe,text='Computation is in progress for:')
@@ -1390,7 +1455,7 @@ class Show_details_window():
 			self.showimage_frame.pack(anchor='w',fill=X)	
 			self.plotsolution_list=[]
 			for i in range(len(computation.Channelnames)):
-				self.plotsolution_list.append(showimages(computation,'tmp/'+str(computation.number)+'/result',computation.Channelnames[i],computation.slices,self.showimage_frame.interior))
+				self.plotsolution_list.append(showimages(computation,os.path.join('tmp',str(computation.number),'result'),computation.Channelnames[i],computation.slices,self.showimage_frame.interior))
 			if len(computation.Channelnames)>1:
 				self.plotsolution_list[len(computation.Channelnames)-2].label.config(text='All channels in original ratio')
 				self.plotsolution_list[len(computation.Channelnames)-1].label.config(text='All channels in normalized ratio')
@@ -1474,7 +1539,7 @@ class showimages():
 		self.channelname=channelname
 		self.label=Label(self.frame,text=channelname,width=40,anchor='w')
 		self.label.grid(row=0,column=0,sticky='W')
-		self.data=mrcfile.open(source+channelname+'.mrc').data
+		self.data=mrcfile.open(source+'_'+channelname+'.mrc').data
 		self.Nz=self.data.shape[0]
 		
 		self.viewminus=Button(self.frame,text='-', command=self.decrease_projectionnumber)
@@ -1514,18 +1579,18 @@ class showimages():
 		try:
 			global startingpath
 			
-			name = tkFileDialog.asksaveasfilename(initialdir=startingpath,title = "Save data for channel "+self.channelname+" in "+self.computation.namefield.get(),filetypes = (("MRC files","*.mrc"),("all files","*.*")),initialfile = self.computation.namefield.get()+self.channelname+'.mrc')						
+			name = tkFileDialog.asksaveasfilename(parent=self.Returnwindow,initialdir=startingpath,title = "Save data for channel "+self.channelname+" in "+self.computation.namefield.get(),filetypes = (("MRC files","*.mrc"),("all files","*.*")),initialfile = self.computation.namefield.get()+'_'+self.channelname+'.mrc')						
 			
 			if name!='':
-				startingpath= '/'.join( name.split('/')[:-1] )
+				startingpath= os.path.split(name)[0]#folderseparator.join( name.split(folderseparator)[:-1] )
 				try:#Remove .mrc
 					if name[len(name)-4:len(name)]=='.mrc':
 						name=name[0:len(name)-4]
 				except:
 					pass
-				shutil.copyfile(self.source+self.channelname+'.mrc',name+'.mrc') 
-				if self.channelname not in ['Collection','Collection2']:
-					shutil.copyfile(self.source+self.channelname+'sinogram.mrc',name+'sinogram.mrc') 
+				shutil.copyfile(self.source+'_'+self.channelname+'.mrc',name+'.mrc') 
+				if self.channelname not in ['all_channels','all_channels_normalized']:
+					shutil.copyfile(self.source+'_'+self.channelname+'_sinogram.mrc',name+'_sinogram.mrc') 
 				
 		except Exception as err:
 			template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -1608,15 +1673,15 @@ class savebutton():
 			name = tkFileDialog.asksaveasfilename(initialdir=startingpath,title = "Save data for "+self.computation.namefield.get(),filetypes = (("all files","*.*"),("MRC files","*.mrc")),initialfile = self.computation.namefield.get())						
 			
 			if name!='':
-				startingpath= '/'.join( name.split('/')[:-1] )
+				startingpath= os.path.split(name)[0]#folderseparator.join( name.split(folderseparator)[:-1] )
 				if name[len(name)-4:len(name)]=='.mrc':
 					name=name[0:len(name)-4]
 
 				for channel in self.computation.Channelnames:
-					shutil.copyfile('tmp/'+str(self.computation.number)+'/result'+channel+'.mrc',name+channel+'.mrc') 
-					if channel not in ['Collection','Collection2']:
-						shutil.copyfile('tmp/'+str(self.computation.number)+'/result'+channel+'sinogram.mrc',name+channel+'sinogram.mrc') 
-				configname=glob.glob('tmp/'+str(self.computation.number)+'/result*.config')[0]
+					shutil.copyfile(os.path.join('tmp',str(self.computation.number),'result'+'_'+channel+'.mrc'),name+'_'+channel+'.mrc') 
+					if channel not in ['all_channels','all_channels_normalized']:
+						shutil.copyfile(os.path.join('tmp',str(self.computation.number),'result'+'_'+channel+'_sinogram.mrc'),name+'_'+channel+'_sinogram.mrc') 
+				configname=glob.glob(os.path.join('tmp',str(self.computation.number),'result*.config'))[0]
 				shutil.copyfile(configname,name+'.config')
 		except Exception as err:
 			template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -1654,7 +1719,7 @@ class stoppingbutton():
 			pass #Avoid error if button is not yet set
 		try:
 			number=self.ComputationButton.number
-			shutil.rmtree('tmp/'+str(number))
+			shutil.rmtree(os.path.join('tmp',str(number)))
 		except:
 			pass
 	
@@ -1673,7 +1738,7 @@ class stoppingbutton():
 		self.ComputationButton.computationbuttonframe.pack_forget()
 		number=self.ComputationButton.number
 		try:
-			shutil.rmtree('tmp/'+str(number))
+			shutil.rmtree(os.path.join('tmp',str(number)))
 		except:
 			pass
 		if 	self.ComputationButton.show_window.Returnwindow.winfo_exists()==True:
@@ -1810,6 +1875,7 @@ Reconstructionframetitle.pack()
 pos=1
 Regularisationchoice=Optionbox(Reconstructionframe,['TGV','TV'],pos,'Regularization: ',0)
 tip = ListboxToolTip(Regularisationchoice.frame, ["Chooses which regularization type to use: TGV is better suited for continuous transitions, TV for piecewise constant reconstructions."],[450,45]) 
+Regularisationchoice.option.bind("<Button-1>",tip.leave)
 
 Alphachoice=Parameterchoice(Reconstructionframe,pos,'Regularization order ratio: ','4')
 tip = ListboxToolTip(Alphachoice.frame, ["Chooses the ratio of first and second order regularization parameter in TGV regularization (irrelevant for TV). The fixed value 4 is usually suitable and does not need to be adapted."],[300,120]) 
@@ -1817,6 +1883,7 @@ tip = ListboxToolTip(Alphachoice.frame, ["Chooses the ratio of first and second 
 pos +=1
 Couplingchoice=Optionbox(Reconstructionframe,Couplingoptions_long,pos,'Coupling type:  ',4)
 tip = ListboxToolTip(Couplingchoice.frame, ["Chooses which kind of coupling to use in the regularization, choosing between 2D and 3D reconstruction (couping in z dimension), and uncoupled or coupled with Frobenius norm or nuclear norm."],[450,90]) 
+Couplingchoice.option.bind("<Button-1>",tip.leave)
 
 Total_Reg_parameter=Parameterchoice(Reconstructionframe,pos,'Global regularization: ','1')
 tip = ListboxToolTip(Total_Reg_parameter.frame, ["Chooses an overall regularization parameter, which affects all channels uniformly (each weight is multiplied by this value), so if a suitable ratio of weights is found, it suffices to adapt this parameter."],[300,120]) 
@@ -1824,6 +1891,7 @@ tip = ListboxToolTip(Total_Reg_parameter.frame, ["Chooses an overall regularizat
 pos +=1
 Discrepancychoice=Optionbox(Reconstructionframe,['KL','L2'],pos,'Discrepancy:     ',0)
 tip = ListboxToolTip(Discrepancychoice.frame, ["Chooses which discrepancy type to use: KL (Kullback-Leibler) is suited for data affected by Poisson noise, L2 (sum of squares) is suited for data affected by Gaussian noise."],[450,90]) 
+Discrepancychoice.option.bind("<Button-1>",tip.leave)
  
 Maxiterchoice=Parameterchoice(Reconstructionframe,pos,'Number of iterations: ','2500') 
 tip = ListboxToolTip(Maxiterchoice.frame, ["Fixes the number of iterative steps used in the reconstruction algorithm."],[300,45]) 
@@ -1859,7 +1927,17 @@ tip = ListboxToolTip(Overlappingbutton.frame, ["When computations require more m
 pos+=2
 
 slices_choice=Slicereader(Computational_Frame, pos,'Slices to process:   ')
-tip = ListboxToolTip(slices_choice.frame, ["Determines which slices will be reconstructed. The initial slice, the final one and a stepsize between the slices can be given. (E.g., 0 10 2 means that the slices 0,2,4,6,8,10 are reconstructed."],[450,90]) 
+tip = ListboxToolTip(slices_choice.frame2, ["Determines which slices will be reconstructed. The initial slice, the final one and a stepsize between the slices can be given. (E.g., 0 10 2 means that the slices 0,2,4,6,8,10 are reconstructed.)"],[450,90]) 
+slices_choice.start.bind("<FocusIn>",tip.leave)
+slices_choice.start.bind("<Key>",tip.leave)
+slices_choice.end.bind("<FocusIn>",tip.leave)
+slices_choice.end.bind("<Key>",tip.leave)
+slices_choice.step.bind("<FocusIn>",tip.leave)
+slices_choice.step.bind("<Key>",tip.leave)
+
+tip = ListboxToolTip(slices_choice.frame3, ["Allows to manually limit the number of slices of the data to be used per computation. The program will try to split the problem into (slightly overlapping) subproblems where in each subproblem only as many slices as given with this parameter will be used. If the field is left empty, no limit on the number of used slices is set."],[420,110]) 
+slices_choice.split.bind("<FocusIn>",tip.leave)
+slices_choice.split.bind("<Key>",tip.leave)
 
 pos+=2
 
@@ -1868,6 +1946,8 @@ Extractionframe.pack(side=BOTTOM)
 Extract_InformationButton=Button(Extractionframe,text='Show command line',command=Extract_Information_show)
 tip = ListboxToolTip(Extractionframe, ["Shows the command line corresponding to the current options. The field on the left specifies the path and prefix of the output files. (This has no impact on the reconstructions started via the GUI.)"],[450,70],[-20,-100]) 
 Extract_InformationButton.grid(row=0,column=2)
+Extract_InformationButton.bind("<Button-1>",tip.leave)
+
 
 Extract_Information_outfield=Outline(Extractionframe)
 
@@ -1895,7 +1975,7 @@ try:
 	del GPUchoice
 	GPUchoice=Optionbox(Computational_Frame,my_gpu_devices,pos,'',0)
 	tip = ListboxToolTip(GPUchoice.frame, ["Chooses which OpenCL device is used for the computations."],[450,30]) 
-
+	GPUchoice.option.bind("<Button-1>",tip.leave)
 except ImportError as err:
 	template = "An exception of type {0} occurred. Arguments:\n{1!r}"
 	message = template.format(type(err).__name__, err.args)
@@ -1968,21 +2048,22 @@ initial_computationbutton=computationbutton(None,computationbuttonframeBig.inter
 def main():	
 	global startingpath
 	startingpath=os.getcwd()
-	mypath= os.path.realpath(__file__)
-	mypath= '/'.join( mypath.split('/')[:-1] )
-	os.chdir(mypath)
-	
-	##Debugging Mode	
-	#import pdb; pdb.set_trace()
-	
-	
-	
-	#Cleanup old tmp files
-	Filelist=glob.glob('tmp/*')
-	for entry in Filelist:#Delete files in tmp folder which are older than 5 days
-		if time.time()-os.stat(entry).st_mtime>60*60*24*5:
-		#	shutil.rmtree(entry)
-			pass
+	mypath=startingpath
+	try:
+		mypath= os.path.realpath(__file__)
+		mypath= os.path.split(mypath)[0]#folderseparator.join( mypath.split(folderseparator)[:-1] )
+		os.chdir(mypath)
+	except Exception as err:
+		print( 'trolol')
+		template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+		message = template.format(type(err).__name__, err.args)
+		eprint(message)
+	else:	#Cleanup old tmp files
+		Filelist=glob.glob(os.path.join('tmp','*'))
+		for entry in Filelist:#Delete files in tmp folder which are older than 5 days
+			if time.time()-os.stat(entry).st_mtime>60*60*24*5:
+				#shutil.rmtree(entry)
+				pass
 	#Main loop
 	w, h = fenster.winfo_screenwidth(), fenster.winfo_screenheight()
 	fenster.geometry("%dx%d+0+0" % (w, h))

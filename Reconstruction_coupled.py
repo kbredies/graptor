@@ -32,8 +32,8 @@
 ## 
 ## [1] R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner,
 ##     K. Bredies. Total Generalized Variation regularization for
-##     multi-modal electron tomography. RSC Nanoscale, accepted
-##     January 2019.
+##     multi-modal electron tomography. *Nanoscale*, 2019. 
+##     DOI: [10.1039/C8NR09058K](https://doi.org/10.1039/C8NR09058K).
 ##
 ## [2] M. Holler, R. Huber, F. Knoll. Coupled regularization with
 ##     multiple data discrepancies. Inverse Problems, Special
@@ -80,6 +80,10 @@ def get_gpu_context(GPU_choice):
 		for i in range(0,len(my_gpu_devices)):
 			print( '(',i,')' ,my_gpu_devices[i])
 		GPU_choice=input('Choose device to use by entering the number preceeding it: ' )
+		try:
+			GPU_choice = int(GPU_choice)
+		except ValueError:
+			print('Please enter an integer value')
 
 	if GPU_choice in range(0,len(my_gpu_devices)):
 		gerat=[my_gpu_devices[GPU_choice]]
@@ -87,9 +91,22 @@ def get_gpu_context(GPU_choice):
 	else:
 		ctx = cl.create_some_context()
 	return ctx, my_gpu_devices, GPU_choice
+	
+	
+def Allows_number_slices(imageshape,sinogram_shape,number_channels,device):
+	#4 byte pro pixel mit 23 Images * number_channels +2 Images (for norms) + 3 sinograms
+	bytes_per_slice=4*(imageshape[0]*imageshape[1]*23+sinogram_shape[0]*sinogram_shape[1]*3)*number_channels+4*imageshape[0]*imageshape[1]*2
+	maximal_allocation_per_slice= 4*max(8*imageshape[0]*imageshape[1],sinogram_shape[0]*sinogram_shape[1])*number_channels
+	global_memory=device.global_mem_size
+	max_individual_allocation=device.max_mem_alloc_size
+	
+	Limit1=max_individual_allocation//maximal_allocation_per_slice
+	Limit2=global_memory//bytes_per_slice
+	Limit=min(Limit1,Limit2)
+	return Limit
 
 	
-def Coupled_Reconstruction2d(names,result, mu,alpha,maxiter,plott,method,Slice_levels,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy):
+def Coupled_Reconstruction2d(names,result, mu,alpha,maxiter,plott,method,Slice_levels,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy,Scalepars):
 	"""
 	Reconstruction method employed for 2D reconstruction. Mainly deals with pre and post processing of data and calls reconstruction algorithm
 	
@@ -139,10 +156,10 @@ def Coupled_Reconstruction2d(names,result, mu,alpha,maxiter,plott,method,Slice_l
 		if min(Slice_levels[0],Slice_levels[1])<0 or max(Slice_levels[0],Slice_levels[1])>=Ny:
 			raise IndexError('Warning!!!, Slice levels are not in a suitable scope. Must lie between 0 and Ny=', str(Ny-1),'. Aborting operation!')
 			
-		np_data-=np.percentile(np_data,1)
+		np_data-=np.percentile(np_data,Scalepars[0])
 		ratio.append(np.sum(np_data[:,considered])/len(angles))
 
-		np_data=np_data/np.percentile(np_data,98) 
+		np_data=np_data/np.percentile(np_data,Scalepars[1]) 
 		np_data_coll.append(np_data)
 		Averagenoise.append(averagenoise)		
 
@@ -248,22 +265,22 @@ def Coupled_Reconstruction2d(names,result, mu,alpha,maxiter,plott,method,Slice_l
 	
 		#Save as Mrc Files
 		for i in range(0,Number_Channels):
-			mrc=mrcfile.new(name+Channelnames[i]+'.mrc',overwrite=True)
-			mrcsino=mrcfile.new(name+Channelnames[i]+'sinogram.mrc',overwrite=True);
+			mrc=mrcfile.new(name+'_'+Channelnames[i]+'.mrc',overwrite=True)
+			mrcsino=mrcfile.new(name+'_'+Channelnames[i]+'_sinogram.mrc',overwrite=True);
 			mrc.set_data(Solution[i]);	
 			mrcsino.set_data(New_sinogram[i]);
 
 		#Save Collected_data
 		if Number_Channels>1:
 			
-			mrcColl=mrcfile.new(name+'Collection.mrc',overwrite=True);
+			mrcColl=mrcfile.new(name+'_all_channels.mrc',overwrite=True);
 			Collection=np.zeros([Nz,Nx,Number_Channels*Nx],dtype=np.float32)
 			for i in range(0,Nz):
 				for l in range(0,Number_Channels):
 					Collection[i,:,l*Nx:(l+1)*Nx]=Solution[l,i,:,:]
 			mrcColl.set_data(Collection);
 				
-			mrcColl=mrcfile.new(name+'Collection2.mrc',overwrite=True);
+			mrcColl=mrcfile.new(name+'_all_channels_normalized.mrc',overwrite=True);
 			Collection=np.zeros([Nz,Nx,Number_Channels*Nx],dtype=np.float32)
 			for i in range(0,Nz):
 				for l in range(0,Number_Channels):
@@ -274,7 +291,7 @@ def Coupled_Reconstruction2d(names,result, mu,alpha,maxiter,plott,method,Slice_l
 	sys.stdout.flush()
 	return Solution
 
-def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogram_level,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy,overlay):
+def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogram_level,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy,overlay,Chunksize,Scalepars):
 	"""
 	Reconstruction method employed for 3D reconstruction. Mainly deals with pre and post processing of data and calls reconstruction algorithm
 	
@@ -294,6 +311,7 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 		Regularisation ... TV or TGV as String to determine the regularisation functional used
 		Discrepancies ... KL or L2 as String, to denote the data fidelity term used
 		overlay ... Integer value denoting the degree of overlapping if the problem must be split in subproblems due to memory constraints
+		Chunksize ... Allows to limit the maximal size of a split
 		"""
 	
 	
@@ -328,8 +346,8 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 		
 		#Data scalation
 		ratio.append(np.sum(np_data[:,section])/len(angles))
-		np_data-=np.percentile(np_data,1)
-		np_data=np_data/np.percentile(np_data,98) 
+		np_data-=np.percentile(np_data,Scalepars[0])
+		np_data=np_data/np.percentile(np_data,Scalepars[1]) 
 		np_data_coll.append(np_data)
 	
 		Nxoriginal=Nx
@@ -377,7 +395,18 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 	considered=section[:]
 	remaining=considered[:]
 	relevants=[]
+	
+	
+
+	ndetectors=sino_coll[0].shape[2]
+	nangles=sino_coll[0].shape[0]
 	possible=len(remaining)
+	Memory_limit=int(Allows_number_slices([ndetectors,ndetectors],[ndetectors,nangles],len(sino_coll),my_gpu_devices[GPU_choice]))#70% of technical limitations
+	if Memory_limit>=1:
+		possible=min(possible,Memory_limit)
+	if Chunksize>=1:
+		possible=min(possible,Chunksize)
+
 	U=np.zeros([Number_Channels,Nx,Nx,len(section)])
 	New_sinogram=np.zeros([Number_Channels,sino_coll[0].shape[0],sino_coll[0].shape[1],sino_coll[0].shape[2]])
 	import time
@@ -456,21 +485,21 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 				
 			#Save as Mrc Files
 			for i in range(0,Number_Channels):
-				mrc=mrcfile.new(name+Channelnames[i]+'.mrc',overwrite=True)
-				mrcsino=mrcfile.new(name+Channelnames[i]+'sinogram.mrc',overwrite=True);
+				mrc=mrcfile.new(name+'_'+Channelnames[i]+'.mrc',overwrite=True)
+				mrcsino=mrcfile.new(name+'_'+Channelnames[i]+'_sinogram.mrc',overwrite=True);
 				mrc.set_data(Solution[i]);	
 				mrcsino.set_data(Newsino2[i]);	
 				
 			#Save Collected_data
 			if Number_Channels>1:
-				mrcColl=mrcfile.new(name+'Collection.mrc',overwrite=True);
+				mrcColl=mrcfile.new(name+'_all_channels.mrc',overwrite=True);
 				Collection=np.zeros([Nz,Nx,Number_Channels*Ny],dtype=np.float32)
 				for i in range(0,Nz):
 					for j in range(0,Number_Channels):
 						Collection[i,:,j*Ny:(j+1)*Ny]=Solution[j,i,:,:]
 				mrcColl.set_data(Collection);	
 				
-				mrcColl=mrcfile.new(name+'Collection2.mrc',overwrite=True);
+				mrcColl=mrcfile.new(name+'_all_channels_normalized.mrc',overwrite=True);
 				Collection=np.zeros([Nz,Nx,Number_Channels*Nx],dtype=np.float32)
 				for i in range(0,Nz):
 					for l in range(0,Number_Channels):
@@ -482,9 +511,9 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 			possible=int(possible*0.7)
 			eprint(	 'Warning: Computation requires too much memory, the problem is split, trying to compute '+str(possible)+' slices at once.')
 			sys.stderr.flush()
-			del(ctx)
-			gerat=[my_gpu_devices[GPU_choice]]
-			ctx = cl.Context(devices=gerat)
+			#del(ctx)
+			#gerat=[my_gpu_devices[GPU_choice]]
+			#ctx = cl.Context(devices=gerat)
 			
 			if possible<1:
 				template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -500,9 +529,9 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 
 			eprint('Warning: unexpected PyOpenCL error occurred, trying to restart context.')
 			sys.stderr.flush()
-			del(ctx)
-			gerat=[my_gpu_devices[GPU_choice]]
-			ctx = cl.Context(devices=gerat)
+			#del(ctx)
+			#gerat=[my_gpu_devices[GPU_choice]]
+			#ctx = cl.Context(devices=gerat)
 			if possible<1:
 				raise ('Even a single slice creates an unknown error.')
 							
@@ -510,7 +539,7 @@ def Coupled_Reconstruction3d(names,result, mu,alpha,maxiter,plott,method,sinogra
 	sys.stdout.flush()
 	return U
 
-def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,maxiter,plott,method,sinogram_level,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy,PixelSizeinput,overlay):
+def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,maxiter,plott,method,sinogram_level,datahandling,GPU_choice,Channelnames,reductionparameter,Regularisation,Discrepancy,PixelSizeinput,overlay,Chunksize,Scalepars):
 	print( '######################## Preprocessing: #####################')
 	sys.stdout.flush()
 	[prozent_to_reduce,searchradius]=reductionparameter
@@ -610,8 +639,8 @@ def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,max
 		corresp=i >=smallerimagestart
 		np_data=np_data_coll[i]
 		ratio.append(np.sum(np_data[:,Sectionset[corresp]]/len(Angles[i])))
-		np_data-=np.percentile(np_data,1)
-		np_data=np_data/np.percentile(np_data,98) 
+		np_data-=np.percentile(np_data,Scalepars[0])
+		np_data=np_data/np.percentile(np_data,Scalepars[1]) 
 		np_data_coll[i]=np_data
 		
 	#Get Relevant Sinogram	
@@ -657,7 +686,16 @@ def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,max
 	considered=section0[:]
 	considered_small=section1[:]
 	remaining=considered[:]
+	
+	ndetectors=sino_coll[0].shape[2]
+	nangles=sino_coll[0].shape[0]
 	possible=len(remaining)
+	Memory_limit=Allows_number_slices([ndetectors,ndetectors],[ndetectors,nangles],len(sino_coll),my_gpu_devices[GPU_choice])#technical limitations
+	if Memory_limit>=1:
+		possible=min(possible,Memory_limit)
+	if Chunksize>=1:
+		possible=min(possible,Chunksize)
+	
 	U=np.zeros([Number_Channels,Nx0,Nx0,len(section0)])
 	New_sino=np.zeros([Number_Channels0,sino_coll[0].shape[0],len(considered),sino_coll[0].shape[2]],dtype=float32)
 	New_sino_small=np.zeros([Number_Channels1,sino_coll[Number_Channels0].shape[0],len(considered_small),sino_coll[Number_Channels0].shape[2]],dtype=float32)
@@ -768,27 +806,27 @@ def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,max
 			
 			#Save as Mrc Files
 			for i in range(0,Number_Channels):
-				mrc=mrcfile.new(name+Channelnames[i]+'.mrc',overwrite=True)
+				mrc=mrcfile.new(name+'_'+Channelnames[i]+'.mrc',overwrite=True)
 				mrc.set_data(Solution[i]);	
 					
 			for i in range(Number_Channels1):
-				mrcsino=mrcfile.new(name+Channelnames[i+Number_Channels0]+'sinogram_smallresu.mrc',overwrite=True);
+				mrcsino=mrcfile.new(name+'_'+Channelnames[i+Number_Channels0]+'_sinogram_smallresu.mrc',overwrite=True);
 				mrcsino.set_data(New_sinogram_small[i]);
-				mrcsino=mrcfile.new(name+Channelnames[i+Number_Channels0]+'sinogram.mrc',overwrite=True);
+				mrcsino=mrcfile.new(name+'_'+Channelnames[i+Number_Channels0]+'_sinogram.mrc',overwrite=True);
 				mrcsino.set_data(New_sinogram_high[i]);
 			for i in range(Number_Channels0):
-				mrcsino=mrcfile.new(name+Channelnames[i]+'sinogram.mrc',overwrite=True);
+				mrcsino=mrcfile.new(name+'_'+Channelnames[i]+'_sinogram.mrc',overwrite=True);
 				mrcsino.set_data(New_sinogram[i]);
 			
 			#Save Collected_data
-			mrcColl=mrcfile.new(name+'Collection.mrc',overwrite=True);
+			mrcColl=mrcfile.new(name+'_all_channels.mrc',overwrite=True);
 			Collection=np.zeros([Nz,Nx,Number_Channels*Ny],dtype=np.float32)
 			for i in range(0,Nz):
 				for j in range(0,Number_Channels):
 					Collection[i,:,j*Ny:(j+1)*Ny]=U[j,:,:,i]
 			mrcColl.set_data(Collection);	
 			
-			mrcColl=mrcfile.new(name+'Collection2.mrc',overwrite=True);
+			mrcColl=mrcfile.new(name+'_all_channels_normalized.mrc',overwrite=True);
 			Collection=np.zeros([Nz,Nx,Number_Channels*Nx],dtype=np.float32)
 			for i in range(0,Nz):
 				for l in range(0,Number_Channels):
@@ -799,9 +837,9 @@ def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,max
 			possible=int(possible*0.7)
 			eprint(	 'Warning: Computation requires too much memory, the problem is split, trying to compute '+str(possible)+' slices at once.')
 			sys.stderr.flush()
-			del(ctx)
-			gerat=[my_gpu_devices[GPU_choice]]
-			ctx = cl.Context(devices=gerat)
+			#del(ctx)
+			#gerat=[my_gpu_devices[GPU_choice]]
+			#ctx = cl.Context(devices=gerat)
 			
 			if possible<1:
 				template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -817,9 +855,9 @@ def Coupled_Reconstruction3dbigresu(names,smallerimagestart,result, mu,alpha,max
 
 			eprint('Warning: unexpected PyOpenCL error occurred, trying to restart context.')
 			sys.stderr.flush()
-			del(ctx)
-			gerat=[my_gpu_devices[GPU_choice]]
-			ctx = cl.Context(devices=gerat)
+			#del(ctx)
+			#gerat=[my_gpu_devices[GPU_choice]]
+			#ctx = cl.Context(devices=gerat)
 			if possible<1:
 				raise ('Even a single slice creates an unknown error.')
 
@@ -844,7 +882,7 @@ def main():
 						help='Names of input h5 or mrc files of a second projection data set (with the same requirements as for --Infiles) in a different (lower) resolution. This is only relevant when using subsampling.')
    
 	parser.add_argument('-o','--Outfile',default="reconstruction",
-						help='Prefix of the output files, e.g. Results/example1/data. Several MRC files are created when the algorithm terminates: The individual reconstructions <prefix><channelname>.mrc (see option --Channelnames), the sinograms of the reconstructions <prefix><channelname>sinogram.mrc, and two collection files containing all reconstructions in a single file (<prefix>Collection.mrc in correct ratio, <prefix>Collection2.mrc with normalized values).') 
+						help='Prefix of the output files, e.g. Results/example1/data. Several MRC files are created when the algorithm terminates: The individual reconstructions <prefix><channelname>.mrc (see option --Channelnames), the sinograms of the reconstructions <prefix><channelname>sinogram.mrc, and two collection files containing all reconstructions in a single file (<prefix>all_channels.mrc in correct ratio, <prefix>all_channels_normalized.mrc with normalized values).') 
 	
 	parser.add_argument('--SliceLevels',
 						type=int, default=[0] ,nargs='+',
@@ -885,9 +923,13 @@ def main():
  
 	parser.add_argument('--Overlapping',default=1,type=int,help='Specifies overlap in case of split computation. If the OpenCL device does not possess a sufficient amount of memory, the program will try to split the problem (splitting the slices being reconstructed). This might lead to issues at the slices where the split occurs. Slightly overlapping the subproblems could lead to more consistency. This parameter specifies the number of slices the resulting subproblems overlap. E.g., if the problem is [1,2,...,10] and we can compute 6 slices in parallel, an overlap of 1 would lead to slices [1...6] being processed but only [1...5] of the results being saved, and computing [5...10] but saving only [6...10]. So this overlap leads to larger subproblems and hence, to redundancy and slightly increased computational effort. The default value is 1, i.e., one overlapping slice is used. A value of 0 deactivates the feature. Depending on the size of the slices, greater overlaps might also be reasonable.')
 
+	parser.add_argument('--Chunksize',default=-1,type=int,help='Allows to manually limit the number of slices of the data to be used per computation. If the chunksize parameter set lower than the total number of slices, the program will try to split the problem into (slightly overlapping) subproblems where in each subproblem only as many slices as given with this parameter will be used. The default value is -1, which sets no limit on the number of used slices. This option allows to manually limit the total memory that will be required by the software. While generally the software will try to split the problem automatically in case of insufficient memory, this option is intended in particular for cases where the automatic splitting delivers unsatisfactory results.')
+	
+	parser.add_argument('--Scalepars',default=[1,98],type=int,nargs='+',help='List of two parameters that allow to adapt the scaling of the data that is carrried out as preprocessing step. If Scalepars=[mn,mx], the data will be scaled such that the mn-th percentile is around 0 and the mx-th percentile is around 1')
+	
 	args = parser.parse_args()
 	# Check if directory to outfile exits
-	outfilepath = '/'.join( args.Outfile.split('/')[:-1] )
+	outfilepath = os.path.split(args.Outfile)[0]#'/'.join( args.Outfile.split('/')[:-1] )
 	print('Output will be written to ' + outfilepath)
 	sys.stdout.flush()
 	if not os.path.exists( outfilepath ) and outfilepath!='':
@@ -1097,11 +1139,11 @@ def main():
 	
 	#execute Reconstruction code
 	if setting==2:
-		u_reconst=Coupled_Reconstruction3dbigresu(names,imagestart,result,mu,TGV,N,plott,methode,SinogramLevels,Datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy,Pixelsize,overlay)
+		u_reconst=Coupled_Reconstruction3dbigresu(names,imagestart,result,mu,TGV,N,plott,methode,SinogramLevels,Datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy,Pixelsize,overlay,args.Chunksize,args.Scalepars)
 	elif setting==1:
-		 u_reconst=Coupled_Reconstruction3d(names,result,mu,TGV,N,plott,methode,SinogramLevels,datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy,overlay)
+		 u_reconst=Coupled_Reconstruction3d(names,result,mu,TGV,N,plott,methode,SinogramLevels,datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy,overlay,args.Chunksize,args.Scalepars)
 	else:
-		 u_reconst=Coupled_Reconstruction2d(names,result,mu,TGV,N,plott,methode,SinogramLevels,datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy)
+		 u_reconst=Coupled_Reconstruction2d(names,result,mu,TGV,N,plott,methode,SinogramLevels,datahandling,GPU_choice,Channelnames,find_bad_projectionsoptions,Regularisation,Discrepancy,args.Scalepars)
 
 	print('\nAlgorithm completed, results are written in '+outfilepath+'.')
 	sys.stdout.flush()

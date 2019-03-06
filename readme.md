@@ -11,7 +11,7 @@ The **Gr**az **Ap**plication for **To**mographic **R**econstruction (Graptor) is
 The code is written for Python 2.7 though it also works in Python 3. No dedicated installation is needed for the program, simply download the code and get started. Be sure to have the following Python modules installed, most of which should be standard.
 
 * tkinter
-* [pyopencl](https://pypi.org/project/pyopencl/)
+* [pyopencl](https://pypi.org/project/pyopencl/) (>=pyopencl-2014.1)
 * [argparse](https://pypi.org/project/argparse/)
 * [numpy](https://pypi.org/project/numpy/)
 * [scipy](https://pypi.org/project/scipy/)
@@ -34,7 +34,7 @@ Additionally, the script `Reconstruction_coupled.py` is provided for using the r
 
 ## Known issues
 
-* There appears to be an issue with the automatic splitting in case of insufficient GPU memory under Windows.
+* There appears to be an issue with the automatic splitting in case of insufficient GPU memory under Windows. If problems occur, try to use the `Maximal split size` option in the GUI or the `Splitsize` paramter of the code to reduce memory requirements.
 
 ## Authors
 
@@ -45,8 +45,26 @@ Additionally, the script `Reconstruction_coupled.py` is provided for using the r
 All authors are affiliated with the [Institute of Mathematics and Scientific Computing](https://mathematik.uni-graz.at/en) at the [University of Graz](https://www.uni-graz.at/en).
 
 ## Publications
+If you find this tool useful, please cite the following associated publication.
 
-* R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner and K. Bredies. Total Generalized Variation regularization for multi-modal electron tomography. To appear in *Nanoscale*, 2019.
+* R. Huber, G. Haberfehlner, M. Holler, G. Kothleitner and K. Bredies. Total Generalized Variation regularization for multi-modal electron tomography. *Nanoscale*, 2019. DOI: [10.1039/C8NR09058K](https://doi.org/10.1039/C8NR09058K)
+
+The experimental data set used in this work can be obtained from the following reference.
+
+* G. Haberfehlner and G. Kothleitner. EDX Electron Tomography Dataset on AlSiYb-Alloy [Data set]. *Zenodo*, 2019. DOI: [10.5281/zenodo.2578866](http://doi.org/10.5281/zenodo.2578866)
+
+## Reproduction of numerical results
+
+The results of the article *Total Generalized Variation regularization for multi-modal electron tomography* can be reproduced with the software by running the following terminal commands inside the Graptor folder.
+
+```
+# Reproduce results with phantom data and save to `phantom_data_results`
+python Reconstruction_coupled.py "example/HAADF_lrsino.mrc" "example/Yb_EDXsino.mrc" "example/Al_EDXsino.mrc" "example/Si_EDXsino.mrc" --Outfile "phantom_data_results/reconstruction" --alpha 4.0 1.0 --mu 0.2 0.0005 0.004 0.0005 --Maxiter 2500 --Regularisation TGV --Discrepancy KL --Coupling FROB3D --SliceLevels 0 59 1 --Channelnames "HAADF" "ytterbium" "aluminum" "silicon" --Datahandling bright thresholding 0 "" 0.05 --Find_Bad_Projections 0 0 --Overlapping 1 
+# Download experimental data
+wget -r -l 1 -nd -P experimental_data -A .mrc,.rawtlt https://zenodo.org/record/2578866
+# Reproduce results with phantom data and save to `experimental_data_results`
+python Reconstruction_coupled.py "experimental_data/FEI HAADF_aligned_norm_ad.mrc" "experimental_data/EDS Al K Map_aligned_norm.mrc"  "experimental_data/EDS Si K Map_aligned_norm.mrc"  "experimental_data/EDS Yb L Map_aligned_norm.mrc" --Outfile "experimental_data_results/reconstruction" --Datahandling bright thresholding 0.0 "" 0.05 --Discrepancy=KL  --Regularisation=TGV --SliceLevels 10 270 1 --alpha 4.0 1.0 --mu 0.1 0.0024 0.0014 0.001 --Coupling=Frob3d --Channelnames HAADF Aluminum Silicon Ytterbium --Maxiter=5000 --Scalepars 0 100
+```
 
 ## Acknowledgements
 
